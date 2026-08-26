@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"dailyChecklists","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"date","order":"DESCENDING"}]},{"collectionGroup":"schedules","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"active","order":"ASCENDING"}]}],"fieldOverrides":[]}
