@@ -1,2 +1,60 @@
-import 'dotenv/config';import express from 'express';import cors from 'cors';import './config/firebase.js';import authRoutes from './routes/auth.routes.js';import scheduleRoutes from './routes/schedule.routes.js';import checklistRoutes from './routes/checklist.routes.js';import historyRoutes from './routes/history.routes.js';import internalRoutes from './routes/internal.routes.js';
-const app=express();app.use(cors({origin:process.env.CLIENT_URL||'http://localhost:5173'}));app.use(express.json({limit:'1mb'}));app.get('/api/health',(req,res)=>res.json({status:'ok',app:'Daily Life'}));app.use('/api/auth',authRoutes);app.use('/api/schedules',scheduleRoutes);app.use('/api/checklists',checklistRoutes);app.use('/api/history',historyRoutes);app.use('/api/internal/jobs',internalRoutes);app.use((err,req,res,next)=>{console.error(err);res.status(err.status||500).json({error:err.message||'Erreur serveur'})});const port=process.env.PORT||5000;app.listen(port,()=>console.log(`Daily Life API :${port}`));
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+
+import './config/firebase.js';
+
+import authRoutes from './routes/auth.routes.js';
+import scheduleRoutes from './routes/schedule.routes.js';
+import checklistRoutes from './routes/checklist.routes.js';
+import historyRoutes from './routes/history.routes.js';
+import internalRoutes from './routes/internal.routes.js';
+
+const app = express();
+
+const allowedOrigins = [
+'http://localhost:5173',
+'https://dalylifelite.netlify.app'
+];
+
+app.use(cors({
+origin: (origin, callback) => {
+if (!origin || allowedOrigins.includes(origin)) {
+callback(null, true);
+} else {
+callback(new Error(`Origin non autorisée par CORS : ${origin}`));
+}
+},
+credentials: true
+}));
+
+app.use(express.json({
+limit: '1mb'
+}));
+
+app.get('/api/health', (req, res) => {
+res.json({
+status: 'ok',
+app: 'Daily Life'
+});
+});
+
+app.use('/api/auth', authRoutes);
+app.use('/api/schedules', scheduleRoutes);
+app.use('/api/checklists', checklistRoutes);
+app.use('/api/history', historyRoutes);
+app.use('/api/internal/jobs', internalRoutes);
+
+app.use((err, req, res, next) => {
+console.error(err);
+
+res.status(err.status || 500).json({
+error: err.message || 'Erreur serveur'
+});
+});
+
+const port = process.env.PORT || 5000;
+
+app.listen(port, () => {
+console.log(`Daily Life API : ${port}`);
+});
