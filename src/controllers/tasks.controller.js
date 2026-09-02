@@ -1,4 +1,10 @@
-import { createTaskService, listTasksService, updateTaskStatusService } from '../services/task.service.js';
+import {
+  createTaskService,
+  listTasksService,
+  updateTaskStatusService,
+  updateTaskDetailsService,
+  updateTaskOrderService,
+} from '../services/task.service.js';
 import { sendSuccess } from '../utils/response.js';
 
 export async function createTask(req, res, next) {
@@ -23,6 +29,24 @@ export async function updateTaskStatus(req, res, next) {
   try {
     const result = await updateTaskStatusService(req.user, req.params.id, req.body.status);
     return sendSuccess(res, 200, 'Statut mis à jour', result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateTaskDetails(req, res, next) {
+  try {
+    const result = await updateTaskDetailsService(req.user, req.params.id, req.body);
+    return sendSuccess(res, 200, 'Tâche mise à jour', result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateTaskOrder(req, res, next) {
+  try {
+    const result = await updateTaskOrderService(req.user, req.params.id, req.body.sortOrder);
+    return sendSuccess(res, 200, 'Ordre mis à jour', result);
   } catch (error) {
     next(error);
   }

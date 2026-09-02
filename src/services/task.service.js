@@ -1,12 +1,81 @@
 import { db } from '../config/firebase.js';
 
 const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+const MANAGER_ROLES = new Set(['MANAGER', 'ADMIN', 'SUPER_ADMIN']);
+
+function isManagerLike(user) {
+  return MANAGER_ROLES.has(user?.role);
+}
+
+function toMillis(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+}
+
+function getDisplayName(profile = {}, fallback = '') {
+  return [profile.prenom, profile.nom].filter(Boolean).join(' ').trim() || profile.name || profile.email || fallback;
+}
+
+function compareTasksDesc(a, b) {
+  const orderA = Number.isFinite(Number(a.sortOrder)) ? Number(a.sortOrder) : toMillis(a.createdAt);
+  const orderB = Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : toMillis(b.createdAt);
+
+  if (orderA !== orderB) {
+    return orderB - orderA;
+  }
+
+  return toMillis(b.createdAt) - toMillis(a.createdAt);
+}
+
+function normalizeTask(task, usersById, projectsById) {
+  const assignee = usersById[task.assigneeId] || {};
+  const creator = usersById[task.createdBy] || {};
+
+  return {
+    ...task,
+    sortOrder: Number.isFinite(Number(task.sortOrder)) ? Number(task.sortOrder) : toMillis(task.createdAt),
+    assigneeName: getDisplayName(assignee, task.assigneeId),
+    createdByName: getDisplayName(creator, task.createdBy),
+    projectName: projectsById[task.projectId]?.name || null,
+  };
+}
+
+async function loadCompanyReferences(companyId) {
+  if (!companyId) {
+    return { usersById: {}, projectsById: {} };
+  }
+
+  const [usersSnap, projectsSnap] = await Promise.all([
+    db.collection('users').where('companyId', '==', companyId).get(),
+    db.collection('projects').where('companyId', '==', companyId).get(),
+  ]);
+
+  return {
+    usersById: Object.fromEntries(usersSnap.docs.map((doc) => [doc.id, { uid: doc.id, ...doc.data() }])),
+    projectsById: Object.fromEntries(projectsSnap.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }])),
+  };
+}
 
 export async function createTaskService(user, payload) {
-  const { title, description, priority, assigneeId, deadline, projectId } = payload;
+  const title = String(payload.title || '').trim();
+  const description = String(payload.description || '').trim();
+  const priority = String(payload.priority || 'MEDIUM').trim().toUpperCase();
+  const deadline = payload.deadline ? String(payload.deadline).trim() : null;
+  const projectId = payload.projectId ? String(payload.projectId).trim() : null;
+  const requestedAssigneeId = payload.assigneeId ? String(payload.assigneeId).trim() : '';
 
-  if (!title || !assigneeId) {
-    throw Object.assign(new Error('Titre et responsable requis'), { status: 400 });
+  if (!title) {
+    throw Object.assign(new Error('Titre requis'), { status: 400 });
+  }
+
+  let assigneeId = requestedAssigneeId;
+  if (user.role === 'EMPLOYEE') {
+    assigneeId = user.uid;
+    if (requestedAssigneeId && requestedAssigneeId !== user.uid) {
+      throw Object.assign(new Error('Vous ne pouvez créer que vos propres tâches'), { status: 403 });
+    }
+  } else if (!assigneeId) {
+    throw Object.assign(new Error('Responsable requis'), { status: 400 });
   }
 
   const assigneeDoc = await db.collection('users').doc(assigneeId).get();
@@ -22,24 +91,25 @@ export async function createTaskService(user, payload) {
   }
 
   if (user.role === 'MANAGER' && user.teamId && assignee.teamId && assignee.teamId !== user.teamId) {
-    throw Object.assign(new Error('Vous ne pouvez assigner qu’aux membres de votre équipe'), { status: 403 });
+    throw Object.assign(new Error("Vous ne pouvez assigner qu'aux membres de votre équipe"), { status: 403 });
   }
 
   if (user.role === 'MANAGER' && user.teamId && !assignee.teamId) {
-    throw Object.assign(new Error('Cet employé n’est pas rattaché à votre équipe'), { status: 403 });
+    throw Object.assign(new Error("Cet employé n'est pas rattaché à votre équipe"), { status: 403 });
   }
 
   const now = new Date().toISOString();
   const ref = await db.collection('tasks').add({
     title,
-    description: description || '',
-    priority: priority || 'MEDIUM',
+    description,
+    priority: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(priority) ? priority : 'MEDIUM',
     status: 'TODO',
     assigneeId,
     createdBy: user.uid,
     companyId: assignee.companyId || requesterCompanyId,
-    projectId: projectId || null,
-    deadline: deadline || null,
+    projectId,
+    deadline,
+    sortOrder: Number.isFinite(Number(payload.sortOrder)) ? Number(payload.sortOrder) : Date.now(),
     createdAt: now,
     updatedAt: now,
     statusHistory: [{ status: 'TODO', changedAt: now, changedBy: user.uid }],
@@ -59,30 +129,22 @@ export async function listTasksService(user) {
 
   const snap = await query.get();
   const tasks = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const usersSnap = await db.collection('users').where('companyId', '==', user.companyId).get();
-  const usersById = Object.fromEntries(usersSnap.docs.map((doc) => [doc.id, { uid: doc.id, ...doc.data() }]));
-
-  const projectsSnap = await db.collection('projects').where('companyId', '==', user.companyId).get();
-  const projectsById = Object.fromEntries(projectsSnap.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }]));
+  const { usersById, projectsById } = await loadCompanyReferences(user.companyId);
 
   const visibleTasks = tasks.filter((task) => {
     if (user.role === 'EMPLOYEE') {
       return task.assigneeId === user.uid;
     }
+
     if (user.role === 'MANAGER' && user.teamId) {
       const assignee = usersById[task.assigneeId] || {};
       return assignee.teamId === user.teamId || task.assigneeId === user.uid;
     }
+
     return true;
   });
 
-  return visibleTasks
-    .map((task) => ({
-      ...task,
-      assigneeName: [usersById[task.assigneeId]?.prenom, usersById[task.assigneeId]?.nom].filter(Boolean).join(' ').trim() || usersById[task.assigneeId]?.email || task.assigneeId,
-      projectName: projectsById[task.projectId]?.name || null,
-    }))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return visibleTasks.map((task) => normalizeTask(task, usersById, projectsById)).sort(compareTasksDesc);
 }
 
 export async function updateTaskStatusService(user, taskId, status) {
@@ -98,27 +160,115 @@ export async function updateTaskStatusService(user, taskId, status) {
 
   const task = doc.data();
   const isOwner = task.assigneeId === user.uid;
-  const isManager = ['MANAGER', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
+  const canManage = isManagerLike(user);
 
-  if (!isOwner && !isManager) {
+  if (!isOwner && !canManage) {
     throw Object.assign(new Error('Non autorisé à modifier cette tâche'), { status: 403 });
   }
 
-  const historyEntry = { status, changedAt: new Date().toISOString(), changedBy: user.uid };
+  if (user.role !== 'SUPER_ADMIN' && user.companyId && task.companyId && task.companyId !== user.companyId) {
+    throw Object.assign(new Error('Tâche hors de votre entreprise'), { status: 403 });
+  }
+
+  const now = new Date().toISOString();
+  const historyEntry = { status, changedAt: now, changedBy: user.uid };
   const updates = {
     status,
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
     statusHistory: [...(task.statusHistory || []), historyEntry],
   };
 
-  if (status === 'COMPLETED') {
-    updates.completionNotification = {
-      sentTo: task.createdBy || null,
-      sentAt: new Date().toISOString(),
-    };
+  if (status === 'COMPLETED' && task.status !== 'COMPLETED') {
+    updates.completedAt = now;
   }
 
   await ref.update(updates);
 
   return { message: 'Statut mis à jour' };
+}
+
+export async function updateTaskDetailsService(user, taskId, payload) {
+  const ref = db.collection('tasks').doc(taskId);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    throw Object.assign(new Error('Tâche introuvable'), { status: 404 });
+  }
+
+  const task = doc.data();
+  const isOwner = task.assigneeId === user.uid;
+  const canManage = isManagerLike(user);
+
+  if (user.role === 'EMPLOYEE' && !isOwner) {
+    throw Object.assign(new Error('Non autorisé à modifier cette tâche'), { status: 403 });
+  }
+
+  if (!isOwner && !canManage) {
+    throw Object.assign(new Error('Non autorisé à modifier cette tâche'), { status: 403 });
+  }
+
+  if (user.role !== 'SUPER_ADMIN' && user.companyId && task.companyId && task.companyId !== user.companyId) {
+    throw Object.assign(new Error('Tâche hors de votre entreprise'), { status: 403 });
+  }
+
+  const now = new Date().toISOString();
+  const updates = { updatedAt: now };
+
+  if (payload.title !== undefined) {
+    const title = String(payload.title).trim();
+    if (!title) {
+      throw Object.assign(new Error('Titre requis'), { status: 400 });
+    }
+    updates.title = title;
+  }
+
+  if (payload.description !== undefined) {
+    updates.description = String(payload.description).trim();
+  }
+
+  if (payload.priority !== undefined && canManage) {
+    const priority = String(payload.priority).trim().toUpperCase();
+    updates.priority = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(priority) ? priority : task.priority || 'MEDIUM';
+  }
+
+  if (payload.sortOrder !== undefined) {
+    if (!canManage) {
+      throw Object.assign(new Error('Seul un administrateur peut réordonner les tâches'), { status: 403 });
+    }
+    updates.sortOrder = Number(payload.sortOrder);
+  }
+
+  if (Object.keys(updates).length === 1) {
+    throw Object.assign(new Error('Aucune modification à appliquer'), { status: 400 });
+  }
+
+  await ref.update(updates);
+  return { message: 'Tâche mise à jour' };
+}
+
+export async function updateTaskOrderService(user, taskId, sortOrder) {
+  if (!Number.isFinite(Number(sortOrder))) {
+    throw Object.assign(new Error('Ordre invalide'), { status: 400 });
+  }
+
+  const ref = db.collection('tasks').doc(taskId);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    throw Object.assign(new Error('Tâche introuvable'), { status: 404 });
+  }
+
+  const task = doc.data();
+  if (user.role !== 'SUPER_ADMIN' && user.companyId && task.companyId && task.companyId !== user.companyId) {
+    throw Object.assign(new Error('Tâche hors de votre entreprise'), { status: 403 });
+  }
+
+  if (!isManagerLike(user)) {
+    throw Object.assign(new Error('Seul un administrateur peut réordonner les tâches'), { status: 403 });
+  }
+
+  await ref.update({
+    sortOrder: Number(sortOrder),
+    updatedAt: new Date().toISOString(),
+  });
+
+  return { message: 'Ordre mis à jour' };
 }
