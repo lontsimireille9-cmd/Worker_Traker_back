@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { getCompanyProfile, updateCompanyProfile } from '../controllers/profile.controller.js';
-import { requireAuth, requireManager } from '../middleware/auth.middleware.js';
+import { getCompanyProfile, updateCompanyProfile, getUserProfile } from '../controllers/profile.controller.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
+import { requireCompanyAccess } from '../middleware/company.middleware.js';
 
 const router = Router();
 
-router.get('/company', requireAuth, getCompanyProfile);
-router.patch('/company', requireAuth, requireManager, updateCompanyProfile);
+router.get('/me', requireAuth, getUserProfile);
+router.get('/company', requireAuth, requireCompanyAccess, getCompanyProfile);
+router.patch('/company', requireAuth, requireCompanyAccess, updateCompanyProfile);
 
 export default router;

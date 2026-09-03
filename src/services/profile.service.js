@@ -8,6 +8,9 @@ export async function getCompanyProfileService(user) {
 }
 
 export async function updateCompanyProfileService(user, payload) {
+  if (user.role !== 'SUPER_ADMIN') {
+    throw Object.assign(new Error("Seul le SUPER_ADMIN peut modifier le profil de l'entreprise"), { status: 403 });
+  }
   if (!user.companyId) {
     throw Object.assign(new Error('Entreprise non définie'), { status: 404 });
   }
