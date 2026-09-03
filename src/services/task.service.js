@@ -99,6 +99,7 @@ export async function createTaskService(user, payload) {
   }
 
   const now = new Date().toISOString();
+  const assignmentScope = user.role === 'MANAGER' && user.teamId ? 'TEAM' : 'DIRECT';
   const ref = await db.collection('tasks').add({
     title,
     description,
@@ -106,6 +107,8 @@ export async function createTaskService(user, payload) {
     status: 'TODO',
     assigneeId,
     createdBy: user.uid,
+    assignmentScope,
+    teamId: assignmentScope === 'TEAM' ? user.teamId : null,
     companyId: assignee.companyId || requesterCompanyId,
     projectId,
     deadline,
