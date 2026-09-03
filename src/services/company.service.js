@@ -1,5 +1,4 @@
 import { createCompanyRecord, findCompanyById, updateCompanyRecord, findUsersByCompany, updateUserProfile } from '../repositories/user.repository.js';
-import { db } from '../config/firebase.js';
 import { ROLES } from '../constants/roles.js';
 
 export async function createCompanyService(user, payload) {
@@ -29,10 +28,6 @@ export async function createCompanyService(user, payload) {
   if (isFirstCompany) {
     await updateUserProfile(user.uid, { companyId: company.id, role: ROLES.SUPER_ADMIN, updatedAt: now });
   }
-  await db.collection('teams').add({
-    name: 'Direction', companyId: company.id, department: 'Direction', leaderId: user.uid,
-    memberIds: [user.uid], createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  });
   return { ...company, companyId: company.id };
 }
 
