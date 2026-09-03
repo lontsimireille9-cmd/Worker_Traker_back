@@ -13,7 +13,6 @@ import employeesRoutes from './routes/employees.routes.js';
 import teamsRoutes from './routes/teams.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import profileRoutes from './routes/profile.routes.js';
-import companiesRoutes from './routes/companies.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import { logger, errorHandler } from './middleware/auth.middleware.js';
 
@@ -51,12 +50,11 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', tasksRoutes);
-app.use('/api/companies', companyRoutes);
+app.use('/api/company', companyRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/teams', teamsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/companies', companiesRoutes);
 app.use('/api/settings', settingsRoutes);
 
 app.use((req, res) => {

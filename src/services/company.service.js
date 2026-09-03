@@ -2,8 +2,7 @@ import { createCompanyRecord, findCompanyById, updateCompanyRecord, findUsersByC
 import { ROLES } from '../constants/roles.js';
 
 export async function createCompanyService(user, payload) {
-  const isFirstCompany = !user.companyId;
-  if (user.companyId && user.role !== ROLES.SUPER_ADMIN) {
+  if (user.companyId) {
     throw Object.assign(new Error('Ce compte est déjà rattaché à une entreprise'), { status: 409 });
   }
 
@@ -25,9 +24,7 @@ export async function createCompanyService(user, payload) {
   });
 
   await updateCompanyRecord(company.id, { ownerId: user.uid, ownerUid: user.uid });
-  if (isFirstCompany) {
-    await updateUserProfile(user.uid, { companyId: company.id, role: ROLES.SUPER_ADMIN, updatedAt: now });
-  }
+  await updateUserProfile(user.uid, { companyId: company.id, role: ROLES.SUPER_ADMIN, updatedAt: now });
   return { ...company, companyId: company.id };
 }
 
