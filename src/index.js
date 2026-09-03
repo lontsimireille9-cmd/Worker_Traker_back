@@ -14,6 +14,7 @@ import teamsRoutes from './routes/teams.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
+import reportsRoutes from './routes/reports.routes.js';
 import { logger, errorHandler } from './middleware/auth.middleware.js';
 
 dotenv.config({ override: true });
@@ -56,6 +57,7 @@ app.use('/api/teams', teamsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/reports', reportsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route introuvable' });

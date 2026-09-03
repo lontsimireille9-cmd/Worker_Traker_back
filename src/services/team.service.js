@@ -13,9 +13,17 @@ export async function createTeamService(user, payload) {
   const name = String(payload.name || '').trim();
   const leaderId = payload.leaderId ? String(payload.leaderId) : null;
   const department = String(payload.department || '').trim();
+  const memberIds = [...new Set(Array.isArray(payload.memberIds) ? payload.memberIds.map((id) => String(id).trim()).filter(Boolean) : [])];
 
   if (!name) {
     throw Object.assign(new Error('Nom d’équipe requis'), { status: 400 });
+  }
+
+  if (memberIds.length) {
+    const members = await Promise.all(memberIds.map((memberId) => db.collection('users').doc(memberId).get()));
+    if (members.some((member) => !member.exists || member.data().companyId !== user.companyId)) {
+      throw Object.assign(new Error('Un membre sélectionné n appartient pas à votre entreprise'), { status: 400 });
+    }
   }
 
   const now = new Date().toISOString();
@@ -25,7 +33,7 @@ export async function createTeamService(user, payload) {
     department,
     companyId: user.companyId,
     leaderId,
-    memberIds: [],
+    memberIds,
     createdAt: now,
     updatedAt: now,
   };
