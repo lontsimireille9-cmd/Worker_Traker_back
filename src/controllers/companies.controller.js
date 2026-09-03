@@ -1,5 +1,5 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { db } from "../config/firebase.js";
+import { auth, db } from "../config/firebase.js";
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -40,7 +40,7 @@ export async function listCompanies(req, res, next) {
 
     const companies = snapshot.docs.map((doc) => {
       const data = doc.data();
-      return { id: doc.id, name: data.name || "Entreprise", status: data.status || "ACTIVE", ownerId: data.ownerId || data.ownerUid || null, createdAt: data.createdAt || null };
+      return { id: doc.id, name: data.name || "Entreprise", status: data.status || "ACTIVE", ownerId: data.ownerId || data.ownerUid || null, authEmail: data.authEmail || null, createdAt: data.createdAt || null };
     }).sort((a, b) => a.name.localeCompare(b.name));
     return res.json(companies);
   } catch (error) {
@@ -57,10 +57,18 @@ export async function createCompany(req, res, next) {
     if (password.length < 8) return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères" });
 
     const now = new Date().toISOString();
-    const credentials = hashPassword(password);
     const ref = db.collection("companies").doc();
-    await ref.set({ name, status: "ACTIVE", ownerId: req.user.uid, ownerUid: req.user.uid, accessPasswordHash: credentials.hash, accessPasswordSalt: credentials.salt, settings: {}, createdAt: now, updatedAt: now });
-    return res.status(201).json({ id: ref.id, name, status: "ACTIVE", ownerId: req.user.uid, createdAt: now });
+    const authEmail = `company.${ref.id}@worker-tracker.local`;
+    let companyAuthUser;
+    try {
+      companyAuthUser = await auth.createUser({ email: authEmail, password, displayName: name, emailVerified: true });
+      await ref.set({ name, status: "ACTIVE", ownerId: req.user.uid, ownerUid: req.user.uid, authUid: companyAuthUser.uid, authEmail, settings: {}, createdAt: now, updatedAt: now });
+    } catch (error) {
+      if (companyAuthUser?.uid) await auth.deleteUser(companyAuthUser.uid).catch(() => {});
+      await ref.delete().catch(() => {});
+      throw error;
+    }
+    return res.status(201).json({ id: ref.id, name, status: "ACTIVE", ownerId: req.user.uid, authUid: companyAuthUser.uid, authEmail, createdAt: now });
   } catch (error) {
     next(error);
   }
@@ -74,7 +82,18 @@ export async function unlockCompany(req, res, next) {
     if (!canSeeCompany(req.user, company)) return res.status(403).json({ error: "Vous n'avez pas accès à cette entreprise" });
     if (company.status === "DISABLED") return res.status(403).json({ error: "Cette entreprise est désactivée" });
     const employeeAccess = req.user.role === "EMPLOYEE" && req.user.companyId === company.id;
-    if (!employeeAccess && !verifyPassword(String(req.body?.password || ""), company.accessPasswordHash, company.accessPasswordSalt)) return res.status(401).json({ error: "Mot de passe de l'entreprise incorrect" });
+    const companyToken = req.headers["x-company-auth"];
+    let firebaseCompanyAccess = false;
+    if (companyToken && company.authUid) {
+      try {
+        const decoded = await auth.verifyIdToken(String(companyToken));
+        firebaseCompanyAccess = decoded.uid === company.authUid;
+      } catch {
+        firebaseCompanyAccess = false;
+      }
+    }
+    const legacyAccess = !company.authUid && verifyPassword(String(req.body?.password || ""), company.accessPasswordHash, company.accessPasswordSalt);
+    if (!employeeAccess && !firebaseCompanyAccess && !legacyAccess) return res.status(401).json({ error: "Mot de passe de l'entreprise incorrect" });
 
     const rawToken = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
