@@ -93,6 +93,13 @@ export async function getActivityReport(reportId) {
   return { id: snap.id, ...snap.data() };
 }
 
+export async function deleteActivityReport(reportId) {
+  const ref = db.collection('reports').doc(reportId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw Object.assign(new Error('Rapport introuvable'), { status: 404 });
+  await ref.delete();
+}
+
 function pdfEscape(value) { return String(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); }
 
 export function createReportPdf(report) {
