@@ -18,6 +18,17 @@ export async function updateUserProfile(uid, data) {
   return findUserById(uid);
 }
 
+export async function addUserMessagingToken(uid, token) {
+  const userRef = usersCollection.doc(uid);
+  const snapshot = await userRef.get();
+  const currentTokens = snapshot.exists ? snapshot.data()?.messagingTokens || {} : {};
+  await userRef.set({
+    messagingTokens: { ...currentTokens, [token]: true },
+    updatedAt: new Date(),
+  }, { merge: true });
+  return findUserById(uid);
+}
+
 export async function findUsersByCompany(companyId) {
   const snapshot = await usersCollection.where('companyId', '==', companyId).get();
   return snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
