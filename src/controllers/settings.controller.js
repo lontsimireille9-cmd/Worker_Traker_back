@@ -6,7 +6,8 @@ const COLOR_KEYS = ["primary", "primaryDark", "accent", "background", "surface",
 
 export async function getSettings(req, res, next) {
   try {
-    return res.json({ theme: { ...DEFAULT_THEME, ...(req.user.settings?.theme || {}) } });
+    const snap = await db.collection("users").doc(req.user.uid).get();
+    return res.json({ theme: { ...DEFAULT_THEME, ...(snap.data()?.settings?.theme || {}) } });
   } catch (error) {
     next(error);
   }

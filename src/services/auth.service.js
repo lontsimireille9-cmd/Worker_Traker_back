@@ -66,51 +66,15 @@ export async function resolveMatriculeService(matricule) {
     throw Object.assign(new Error('Matricule requis'), { status: 400 });
   }
 
-  const normalizedMatricule = String(matricule)
-    .trim()
-    .toUpperCase();
+  const normalizedMatricule = String(matricule).trim().toUpperCase();
+  const doc = await db.collection('matricules').doc(normalizedMatricule).get();
+  const data = doc.data();
 
-  try {
-    const doc = await db
-      .collection('matricules')
-      .doc(normalizedMatricule)
-      .get();
-
-    if (!doc.exists) {
-      throw Object.assign(
-        new Error(`Matricule inconnu : ${normalizedMatricule}`),
-        { status: 404 }
-      );
-    }
-
-    const data = doc.data();
-
-    if (!data?.email) {
-      throw Object.assign(
-        new Error(`Aucun email associé au matricule ${normalizedMatricule}`),
-        { status: 404 }
-      );
-    }
-
-    return {
-      matricule: normalizedMatricule,
-      email: String(data.email).trim().toLowerCase(),
-    };
-  } catch (error) {
-    // Conserver nos erreurs HTTP volontairement générées
-    if (error?.status) {
-      throw error;
-    }
-
-    console.error('[resolveMatriculeService] Erreur Firestore:', error.message);
-    const unavailable = Number(error?.code) === 8 || /RESOURCE_EXHAUSTED|Quota exceeded/i.test(`${error?.details || ''} ${error?.message || ''}`);
-    throw Object.assign(
-      new Error(unavailable
-        ? 'Le service de connexion est temporairement indisponible. Réessayez après le rétablissement de Firebase.'
-        : 'Impossible de vérifier le matricule avec Firestore'),
-      { status: unavailable ? 503 : 500 }
-    );
+  if (!doc.exists || !data?.email) {
+    throw Object.assign(new Error('Matricule inconnu'), { status: 404 });
   }
+
+  return { email: data.email };
 }
 
 export async function loginWithEmailPasswordService(email, password) {

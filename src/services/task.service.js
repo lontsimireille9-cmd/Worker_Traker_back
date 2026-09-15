@@ -2,9 +2,6 @@ import { db } from '../config/firebase.js';
 
 const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'REJECTED', 'CANCELLED'];
 const MANAGER_ROLES = new Set(['MANAGER', 'ADMIN', 'SUPER_ADMIN']);
-const COMPANY_REFERENCES_TTL = 30 * 1000;
-const companyReferencesCache = new Map();
-const companyReferencesPending = new Map();
 
 function isManagerLike(user) {
   return MANAGER_ROLES.has(user?.role);
@@ -48,24 +45,15 @@ async function loadCompanyReferences(companyId) {
     return { usersById: {}, projectsById: {} };
   }
 
-  const cached = companyReferencesCache.get(companyId);
-  if (cached && cached.expiresAt > Date.now()) return cached.references;
-  if (companyReferencesPending.has(companyId)) return companyReferencesPending.get(companyId);
-
-  const request = Promise.all([
+  const [usersSnap, projectsSnap] = await Promise.all([
     db.collection('users').where('companyId', '==', companyId).get(),
     db.collection('projects').where('companyId', '==', companyId).get(),
-  ]).then(([usersSnap, projectsSnap]) => {
-    const references = {
-      usersById: Object.fromEntries(usersSnap.docs.map((doc) => [doc.id, { uid: doc.id, ...doc.data() }])),
-      projectsById: Object.fromEntries(projectsSnap.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }])),
-    };
-    companyReferencesCache.set(companyId, { references, expiresAt: Date.now() + COMPANY_REFERENCES_TTL });
-    return references;
-  }).finally(() => companyReferencesPending.delete(companyId));
+  ]);
 
-  companyReferencesPending.set(companyId, request);
-  return request;
+  return {
+    usersById: Object.fromEntries(usersSnap.docs.map((doc) => [doc.id, { uid: doc.id, ...doc.data() }])),
+    projectsById: Object.fromEntries(projectsSnap.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }])),
+  };
 }
 
 export async function createTaskService(user, payload) {

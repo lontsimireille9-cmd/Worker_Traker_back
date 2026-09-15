@@ -1,10 +1,7 @@
 import { auth, db } from '../config/firebase.js';
 import { ROLES } from '../constants/roles.js';
 import { sendError } from '../utils/response.js';
-
-const USER_CACHE_TTL = 60 * 1000;
-const userProfileCache = new Map();
-
+import { updateLastLoginService } from '../services/auth.service.js';
 
 export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -14,20 +11,8 @@ export async function requireAuth(req, res, next) {
     return sendError(res, 401, 'Authentification requise');
   }
 
-  let decoded;
   try {
-    decoded = await auth.verifyIdToken(token);
-  } catch {
-    return sendError(res, 401, 'Token invalide ou expiré');
-  }
-
-  try {
-    const cached = userProfileCache.get(decoded.uid);
-    if (cached && cached.expiresAt > Date.now()) {
-      req.user = { uid: decoded.uid, ...cached.profile };
-      return next();
-    }
-
+    const decoded = await auth.verifyIdToken(token);
     const userDoc = await db.collection('users').doc(decoded.uid).get();
 
     if (!userDoc.exists) {
@@ -49,17 +34,16 @@ export async function requireAuth(req, res, next) {
       };
 
       await db.collection('users').doc(decoded.uid).set(fallbackProfile, { merge: true });
-      userProfileCache.set(decoded.uid, { profile: fallbackProfile, expiresAt: Date.now() + USER_CACHE_TTL });
       req.user = { uid: decoded.uid, ...fallbackProfile };
+      await updateLastLoginService(decoded.uid);
       return next();
     }
 
-    const profile = userDoc.data();
-    userProfileCache.set(decoded.uid, { profile, expiresAt: Date.now() + USER_CACHE_TTL });
-    req.user = { uid: decoded.uid, ...profile };
+    req.user = { uid: decoded.uid, ...userDoc.data() };
+    await updateLastLoginService(decoded.uid);
     next();
   } catch (error) {
-    return next(error);
+    return sendError(res, 401, 'Token invalide ou expiré');
   }
 }
 
