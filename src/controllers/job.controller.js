@@ -1,0 +1,1 @@
+import {generateAll,reconcileAll} from '../services/checklist.service.js';export async function generate(req,res){await generateAll();res.json({ok:true})}export async function reconcile(req,res){await reconcileAll();res.json({ok:true})}

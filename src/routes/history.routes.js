@@ -1,0 +1,1 @@
+import {Router} from 'express';import {list,detail} from '../controllers/history.controller.js';import {requireAuth} from '../middleware/auth.middleware.js';const r=Router();r.use(requireAuth);r.get('/',list);r.get('/:date',detail);export default r;

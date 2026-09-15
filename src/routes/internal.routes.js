@@ -1,0 +1,1 @@
+import {Router} from 'express';import {generate,reconcile} from '../controllers/job.controller.js';import {requireCron} from '../middleware/cron.middleware.js';const r=Router();r.use(requireCron);r.post('/generate-daily',generate);r.post('/reconcile',reconcile);export default r;

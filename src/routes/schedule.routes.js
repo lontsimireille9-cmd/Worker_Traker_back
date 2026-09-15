@@ -1,0 +1,1 @@
+import {Router} from 'express';import {list,create,update,remove} from '../controllers/schedule.controller.js';import {requireAuth} from '../middleware/auth.middleware.js';const r=Router();r.use(requireAuth);r.get('/',list);r.post('/',create);r.patch('/:id',update);r.delete('/:id',remove);export default r;

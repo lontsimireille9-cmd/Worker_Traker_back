@@ -1,0 +1,1 @@
+import {Router} from 'express';import {today,byDate,complete} from '../controllers/checklist.controller.js';import {requireAuth} from '../middleware/auth.middleware.js';const r=Router();r.use(requireAuth);r.get('/today',today);r.get('/:date',byDate);r.patch('/:date/items/:itemId/complete',complete);export default r;

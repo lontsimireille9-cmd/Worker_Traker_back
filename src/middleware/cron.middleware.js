@@ -1,0 +1,1 @@
+export function requireCron(req,res,next){const expected=process.env.CRON_SECRET||'';const got=(req.headers.authorization||'').replace(/^Bearer /,'');if(!expected||got!==expected)return res.status(401).json({error:'Job non autorisé'});next()}
