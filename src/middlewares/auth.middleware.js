@@ -35,12 +35,12 @@ export async function requireAuth(req, res, next) {
 
       await db.collection('users').doc(decoded.uid).set(fallbackProfile, { merge: true });
       req.user = { uid: decoded.uid, ...fallbackProfile };
-      await updateLastLoginService(decoded.uid);
+      updateLastLoginService(decoded.uid).catch(() => undefined);
       return next();
     }
 
     req.user = { uid: decoded.uid, ...userDoc.data() };
-    await updateLastLoginService(decoded.uid);
+    updateLastLoginService(decoded.uid).catch(() => undefined);
     next();
   } catch (error) {
     return sendError(res, 401, 'Token invalide ou expiré');
