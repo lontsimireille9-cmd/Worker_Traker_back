@@ -21,15 +21,49 @@ import { logger, errorHandler } from './middleware/auth.middleware.js';
 dotenv.config({ override: true });
 
 const app = express();
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URL_PROD,
+  process.env.CLIENT_URLS,
+  'http://localhost:5173',
+  'https://teamora-app.netlify.app',
+].flatMap((value) => {
+  if (!value) return [];
+  return value.split(',').map((origin) => origin.trim()).filter(Boolean);
+});
+
+const uniqueAllowedOrigins = [...new Set(allowedOrigins)];
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || '*',
+    origin(origin, callback) {
+      if (!origin || uniqueAllowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Origin not allowed by CORS'));
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Content-Type'],
   })
 );
+
+app.options('*', cors({
+  origin(origin, callback) {
+    if (!origin || uniqueAllowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origin not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+}));
 
 app.use(helmet());
 app.use(compression());
