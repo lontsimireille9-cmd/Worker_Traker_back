@@ -1,19 +1,15 @@
 import { Router } from 'express';
-import {
-  createTask,
-  listTasks,
-  updateTaskStatus,
-  updateTaskDetails,
-  updateTaskOrder,
-} from '../controllers/tasks.controller.js';
+import { createTask,listTasks,updateTaskStatus,updateTaskDetails,updateTaskOrder,createSubtasks,listSubtasks,updateSubtask,submitTask,validateTask } from '../controllers/tasks.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
-
-const router = Router();
-
-router.post('/', requireAuth, createTask);
-router.get('/', requireAuth, listTasks);
-router.patch('/:id/status', requireAuth, updateTaskStatus);
-router.patch('/:id/order', requireAuth, updateTaskOrder);
-router.patch('/:id', requireAuth, updateTaskDetails);
-
+const router=Router();
+router.get('/',requireAuth,listTasks);
+router.post('/',requireAuth,createTask);
+router.patch('/:id/status',requireAuth,updateTaskStatus);
+router.patch('/:id/order',requireAuth,updateTaskOrder);
+router.patch('/:id',requireAuth,updateTaskDetails);
+router.get('/:id/subtasks',requireAuth,listSubtasks);
+router.post('/:id/subtasks',requireAuth,createSubtasks);
+router.post('/:id/submit',requireAuth,submitTask);
+router.post('/:id/validate',requireAuth,validateTask);
+router.patch('/subtasks/:id',requireAuth,updateSubtask);
 export default router;

@@ -16,6 +16,13 @@ import profileRoutes from './routes/profile.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import messagesRoutes from './routes/messages.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
+import departmentKpiRoutes from './routes/departmentKpi.routes.js';
+
+import projectTeamsRoutes from './routes/projectTeams.routes.js';
+import projectSectionsRoutes from './routes/projectSections.routes.js';
+import projectSectionTasksRoutes from './routes/projectSectionTasks.routes.js';
+
 import { logger, errorHandler } from './middleware/auth.middleware.js';
 
 dotenv.config({ override: true });
@@ -94,6 +101,12 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/business-kpis', departmentKpiRoutes);
+
+app.use('/api/project-management', projectTeamsRoutes);
+app.use('/api/project-management', projectSectionsRoutes);
+app.use('/api/project-management', projectSectionTasksRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route introuvable' });

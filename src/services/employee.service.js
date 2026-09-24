@@ -2,6 +2,7 @@ import { auth, db } from '../config/firebase.js';
 import { findEmployeeByMatricule, saveEmployeeProfile, saveMatriculeRecord, findEmployeesByCompany } from '../repositories/employee.repository.js';
 import { createUserProfile } from '../repositories/user.repository.js';
 import { ROLES } from '../constants/roles.js';
+import { normalizeDepartment } from '../constants/departments.js';
 
 function buildTechnicalEmail(matricule, companyId) {
   return `${String(matricule).trim().toLowerCase()}@${String(companyId).trim().toLowerCase()}.matricule.local`;
@@ -18,7 +19,7 @@ export async function createEmployeeService(user, payload) {
   const code = String(payload.code || '').trim();
   const role = String(payload.role || 'EMPLOYEE').trim().toUpperCase();
   const teamId = payload.teamId ? String(payload.teamId).trim() : null;
-  const department = String(payload.department || '').trim();
+  const department = normalizeDepartment(payload.department);
   const position = String(payload.position || '').trim();
 
   if (!matricule || !name || !code) {
@@ -50,7 +51,7 @@ export async function createEmployeeService(user, payload) {
     matricule,
     companyId,
     role,
-    department: String(payload.department || '').trim(),
+    department,
     position,
     teamId,
     department,
@@ -94,7 +95,19 @@ export async function listEmployeeService(user) {
     return [];
   }
 
-  const employees = await findEmployeesByCompany(user.companyId);
+  let employees = await findEmployeesByCompany(user.companyId);
+
+  if (user.role === 'MANAGER') {
+    const teamsSnap = await db.collection('teams').where('companyId', '==', user.companyId).get();
+    const teams = teamsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const managedTeams = teams.filter((team) => String(team.leaderId || team.managerId || '') === String(user.uid));
+    const visibleIds = new Set([String(user.uid)]);
+    managedTeams.forEach((team) => (team.memberIds || []).forEach((id) => visibleIds.add(String(id))));
+    employees = employees.filter((employee) => visibleIds.has(String(employee.uid)));
+  } else if (user.role === 'EMPLOYEE') {
+    employees = employees.filter((employee) => String(employee.uid) === String(user.uid));
+  }
+
   const userSnap = await db.collection('users').where('companyId', '==', user.companyId).get();
   const userMap = Object.fromEntries(
     userSnap.docs.map((doc) => [doc.id, { uid: doc.id, ...doc.data() }])
@@ -109,7 +122,7 @@ export async function listEmployeeService(user) {
       email: profile.email || null,
       role: profile.role || employee.role,
       teamId: profile.teamId || employee.teamId || null,
-      department: profile.department || employee.department || '',
+      department: normalizeDepartment(profile.department || employee.department),
     };
   });
 }

@@ -9,3 +9,5 @@ node_modules/
 # Logs
 npm-debug.log*
 *.log
+.env
+firebase-adminsdk*.json
