@@ -2,6 +2,7 @@ import { db } from '../config/firebase.js';
 import { audit } from './audit.service.js';
 import { normalizeDepartment } from '../constants/departments.js';
 import { getMetricDefinitions } from './departmentKpi.service.js';
+import { notifyTaskAssigned, notifyDifficultyReported } from './notification.service.js';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const managerRoles = new Set(['SUPER_ADMIN', 'ADMIN', 'MANAGER']);
@@ -157,7 +158,7 @@ export async function createTaskService(user, payload) {
     estimatePoints: data.estimatePoints,
   });
 
-  return {
+  const result = {
     id: ref.id,
     ...data,
     projectName: context.project.name || context.project.title || 'Projet',
@@ -165,6 +166,8 @@ export async function createTaskService(user, payload) {
     teamName: context.team.name || 'Équipe',
     assigneeName: assigneeData.name || assigneeData.displayName || assigneeData.fullName || assigneeData.email || 'Employé',
   };
+  await notifyTaskAssigned({ task: result, assigneeId, actorId: user.uid });
+  return result;
 }
 
 async function enrichTaskDisplayData(tasks, companyId) {
@@ -267,6 +270,16 @@ export async function updateTaskStatusService(user, taskId, status) {
   await db.collection('tasks').doc(taskId).update(patch);
   await audit(user, 'TASK_STATUS_CHANGED', 'task', taskId, { from: task.status, to: status });
   return { ...task, ...patch };
+}
+
+export async function reportTaskDifficultyService(user, taskId, note = "") {
+  const task = await getTask(user, taskId);
+  if (String(task.assigneeId || "") !== String(user.uid)) throw fail("Seul le responsable de la tâche peut signaler une difficulté", 403);
+  const text = clean(note); if (!text) throw fail("Décrivez la difficulté rencontrée");
+  const ref = db.collection("taskDifficulties").doc(); const report={id:ref.id,taskId,companyId:user.companyId,reporterId:user.uid,note:text,createdAt:now(),status:"OPEN"};
+  await ref.set(report); await db.collection("tasks").doc(taskId).update({difficultyReported:true,difficultyReportedAt:report.createdAt,updatedAt:report.createdAt});
+  await audit(user,"TASK_DIFFICULTY_REPORTED","task",taskId,{difficultyId:ref.id,note:text}); await notifyDifficultyReported({task,reporter:user,note:text});
+  return {...report,taskTitle:task.title};
 }
 
 export async function updateTaskDetailsService(user, taskId, payload) {

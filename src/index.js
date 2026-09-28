@@ -18,6 +18,7 @@ import reportsRoutes from './routes/reports.routes.js';
 import messagesRoutes from './routes/messages.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import departmentKpiRoutes from './routes/departmentKpi.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
 
 import projectTeamsRoutes from './routes/projectTeams.routes.js';
 import projectSectionsRoutes from './routes/projectSections.routes.js';
@@ -103,6 +104,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/business-kpis', departmentKpiRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.use('/api/project-management', projectTeamsRoutes);
 app.use('/api/project-management', projectSectionsRoutes);

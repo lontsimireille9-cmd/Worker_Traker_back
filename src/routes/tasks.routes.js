@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createTask,listTasks,updateTaskStatus,updateTaskDetails,updateTaskOrder,createSubtasks,listSubtasks,updateSubtask,submitTask,validateTask } from '../controllers/tasks.controller.js';
+import { createTask,listTasks,updateTaskStatus,updateTaskDetails,updateTaskOrder,createSubtasks,listSubtasks,updateSubtask,submitTask,validateTask,reportTaskDifficulty } from '../controllers/tasks.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 const router=Router();
 router.get('/',requireAuth,listTasks);
@@ -11,5 +11,6 @@ router.get('/:id/subtasks',requireAuth,listSubtasks);
 router.post('/:id/subtasks',requireAuth,createSubtasks);
 router.post('/:id/submit',requireAuth,submitTask);
 router.post('/:id/validate',requireAuth,validateTask);
+router.post('/:id/difficulty',requireAuth,reportTaskDifficulty);
 router.patch('/subtasks/:id',requireAuth,updateSubtask);
 export default router;

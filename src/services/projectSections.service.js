@@ -1,3 +1,4 @@
+import { createNotifications } from "./notification.service.js";
 import { db } from "../config/firebase.js";
 
 const sectionsRef = db.collection("projectSections");
@@ -112,7 +113,7 @@ export async function createProjectSection({
     updatedAt: new Date()
   });
 
-  return {
+  const result = {
     id: ref.id,
     companyId,
     projectId,
@@ -124,6 +125,8 @@ export async function createProjectSection({
     assigneeId: assigneeId || null,
     status: "ACTIVE"
   };
+  if (assigneeId) await createNotifications({ companyId, recipientIds:[assigneeId], type:"SECTION_ASSIGNED", title:"Nouvelle section attribuée", body:`La section « ${name} » vous a été attribuée.`, data:{projectId,sectionId:ref.id,projectTeamId} });
+  return result;
 }
 
 export async function getProjectSections(user, companyId, projectId) {

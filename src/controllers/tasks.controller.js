@@ -1,4 +1,4 @@
-import { createTaskService,listTasksService,updateTaskStatusService,updateTaskDetailsService,updateTaskOrderService,createSubtasksService,listSubtasksService,updateSubtaskService,submitTaskService,validateTaskService } from '../services/task.service.js';
+import { createTaskService,listTasksService,updateTaskStatusService,updateTaskDetailsService,updateTaskOrderService,createSubtasksService,listSubtasksService,updateSubtaskService,submitTaskService,validateTaskService,reportTaskDifficultyService } from '../services/task.service.js';
 import { sendSuccess } from '../utils/response.js';
 const wrap=(fn,msg='OK')=>async(req,res,next)=>{try{return sendSuccess(res,200,msg,await fn(req));}catch(e){next(e)}};
 export async function createTask(req,res,next){try{return sendSuccess(res,201,'Tâche créée',await createTaskService(req.user,req.body));}catch(e){next(e)}}
@@ -11,3 +11,5 @@ export async function listSubtasks(req,res,next){try{return sendSuccess(res,200,
 export async function updateSubtask(req,res,next){try{return sendSuccess(res,200,'Sous-tâche mise à jour',await updateSubtaskService(req.user,req.params.id,req.body));}catch(e){next(e)}}
 export async function submitTask(req,res,next){try{return sendSuccess(res,200,'Tâche soumise',await submitTaskService(req.user,req.params.id,req.body));}catch(e){next(e)}}
 export async function validateTask(req,res,next){try{return sendSuccess(res,200,'Décision enregistrée',await validateTaskService(req.user,req.params.id,req.body.decision,req.body.note));}catch(e){next(e)}}
+
+export async function reportTaskDifficulty(req,res,next){try{return sendSuccess(res,201,"Difficulté signalée",await reportTaskDifficultyService(req.user,req.params.id,req.body?.note));}catch(e){next(e)}}

@@ -1,3 +1,4 @@
+import { createNotifications } from "./notification.service.js";
 ﻿import { db } from "../config/firebase.js";
 
 const projectsRef = db.collection("projects");
@@ -231,6 +232,8 @@ export async function assignTeamToProject({
     memberIds,
     leaderId: teamManagerId,
   });
+
+  await createNotifications({ companyId, recipientIds:memberIds, type:"PROJECT_ASSIGNED_TO_TEAM", title:"Projet attribué à votre équipe", body:`Le projet « ${project.name || project.title || projectId} » a été attribué à votre équipe.`, data:{projectId,teamId} });
 
   return {
     id: ref.id,
